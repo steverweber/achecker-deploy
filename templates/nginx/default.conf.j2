@@ -1,0 +1,46 @@
+server {
+  listen 80;
+  server_name {{ http_virtualhost }};
+  rewrite ^ https://$server_name$request_uri? permanent;
+}
+
+
+server {
+  listen 443;
+  server_name {{ http_virtualhost }};
+
+  ssl on;
+  ssl_certificate {{ http_ssl_certificate }};
+  ssl_certificate_key {{ http_ssl_certificate_key }};
+  
+  root {{ http_root }};
+
+  client_max_body_size 50m;
+  client_body_buffer_size 128k;
+
+  index index.php index.html index.htm;
+  
+  location ~* \.(jpg|jpeg|gif|png|css|js|ico|xml)$ {
+      access_log        off;
+      log_not_found     off;
+      expires           360d;
+  }
+  
+  location ~* \.php$ {
+    include fastcgi_params;
+    fastcgi_index   index.php;
+    #fastcgi_param HTTPS on;
+    #fastcgi_param SCRIPT_FILENAME {{ http_root }}/$1;
+    #fastcgi_param SCRIPT_FILENAME $document_root/$1;
+    fastcgi_param   SCRIPT_FILENAME    $document_root$fastcgi_script_name;
+    fastcgi_param   SCRIPT_NAME        $fastcgi_script_name;
+    fastcgi_intercept_errors on;
+    fastcgi_pass unix:/var/run/php5-fpm-{{ alias }}.sock;
+  }
+}
+
+
+
+
+
+

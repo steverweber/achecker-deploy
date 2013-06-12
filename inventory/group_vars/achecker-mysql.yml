@@ -1,0 +1,6 @@
+---
+db_login_username: root
+db_login_password: root_mysql_password
+db_name: achecker
+db_username: acheckeru
+db_password: acheckeru_password

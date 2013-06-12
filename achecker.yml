@@ -1,0 +1,150 @@
+
+- hosts: achecker-mysql
+  sudo: yes
+  tasks:
+    - name: ensure mysql packages are installed
+      action: apt pkg=$item
+      with_items:
+        - mysql-server
+        - python-mysqldb
+    - name: ensure mysql running
+      service: name=mysql state=running
+    - name: ensure database is absent
+      action: mysql_db login_user=$db_login_username login_password=$db_login_password login_unix_socket=/var/run/mysqld/mysqld.sock db=$db_name state=absent
+    - name: ensure database
+      action: mysql_db login_user=$db_login_username login_password=$db_login_password login_unix_socket=/var/run/mysqld/mysqld.sock db=$db_name state=present
+    - name: ensure database user
+      action: mysql_user login_user=$db_login_username login_password=$db_login_password login_unix_socket=/var/run/mysqld/mysqld.sock user=$db_username password=$db_password priv=${db_name}.*:ALL state=present
+
+    - shell: mysql -u$db_login_username -p$db_login_password -e "ALTER DATABASE achecker DEFAULT CHARACTER SET utf8 COLLATE utf8_general_ci"
+
+
+# n UTF8. Please set the database character set to UTF8 before continuing by using the following query: ALTER DATABASE `achecker` DEFAULT CHARACTER SET utf8 COLLATE utf8_general_ci. To use ALTER DATABASE, you need the ALTER privilege on the databas
+      
+
+- hosts: achecker
+  sudo: yes
+  tasks:
+    # note the fqdn is used as a regex
+    - name: ensure domain name in hosts file    
+      lineinfile: dest=/etc/hosts regexp='^127\.0\.0\.1 ${http_virtualhost}' line='127.0.0.1 ${http_virtualhost}'
+      
+    - name: ensure app_user
+      user: name=${app_user} system=true shell=/bin/sh comment="App achecker" generate_ssh_key=yes state=present
+ 
+    - name: ensure http user can access app files
+      user: name=www-data groups=${app_user} append=yes state=present
+  
+    - name: ensure folder to hold source code
+      file: path=${app_dest} owner=${app_user} mode=0775 state=directory
+      
+    - apt: pkg=$item
+      with_items:
+          - php5
+          - php5-mysql
+          - git
+#          - php5-ldap
+#          - php5-pgsql
+
+      
+    - name: ensure ssh StrictHostKeyChecking is off
+      lineinfile: dest=/home/achecker/.ssh/ssh_config regexp='^StrictHostKeyChecking no$' line='StrictHostKeyChecking no' create=true
+      sudo_user: achecker
+      
+    - name: ensure latest sourcecode
+      git: version=master repo=${app_repository} dest=${app_dest}
+      sudo_user: achecker
+      
+    - name: ensure tmp
+      file: path=${app_dest}/temp state=directory mode=0777
+      sudo_user: achecker
+      
+      
+    - template: src=templates/config.inc.php.j2 dest=${app_dest}/include/config.inc.php
+      sudo_user: achecker
+
+    - name: ensure packages php5-fpm
+      apt: pkg=php5-fpm state=installed
+      
+    - name: ensure php5-fpm config
+      template: src=$phpfpm_template dest=${phpfpm_conf_path}/$alias.conf
+      notify: restart php5-fpm
+      
+  handlers:
+    - name: restart php5-fpm
+      action: service name=php5-fpm state=restarted
+  
+
+  
+
+  
+# - hosts: achecker-postgresql
+#   sudo: yes
+#   tasks:  
+#     - name: ensure pgsql packages are installed
+#       sudo_user: root
+#       apt: pkg=$item
+#       with_items:
+#           - postgresql
+#           - libpq-dev
+#           - python-psycopg2
+#           
+#     - name: ensure postgres running
+#       service: name=postgresql state=started
+#           
+# ###### CLEAN  
+# - hosts: achecker-postgresql-clean
+#   sudo: yes
+#   tasks:
+#     - name: ensure postgres restarted
+#       service: name=postgresql state=restarted
+#     - name: ensure database is droped
+#       postgresql_db: db=$db_name state=absent
+#       sudo_user: postgres
+#           
+# - hosts: achecker-postgresql
+#   sudo: yes
+#   sudo_user: postgres
+# #    vars_prompt:
+# #    - name: "db_decrypt_password"
+# #      prompt: "Enter db decrypt password"
+# #      private: yes
+#   tasks:
+#     - name: ensure database is created
+#       postgresql_db: db=$db_name encoding='UTF-8' template=template0
+#       notify:
+#         - decrypted database backup
+#         - install database backup
+#             
+#     - name: ensure user has access to database
+#       postgresql_user: db=$db_name user=$db_username password=$db_password priv=ALL role_attr_flags=NOSUPERUSER,NOCREATEDB
+# 
+#   handlers:
+#     - name: decrypted database backup
+#       shell: openssl enc -aes-256-cbc -d -in ${app_dest}/backup.sql.ENC -out ${app_dest}/backup.sql -pass pass:'${db_decrypt_password}' creates=${app_dest}/backup.sql
+#       sudo_user: achecker
+#       
+#     - name: install database backup
+#       shell: psql $db_name < ${app_dest}/backup.sql
+# 
+# #      sudo -u postgres pg_dump $dbname > $fdn/backup.db
+# # sudo -u postgres -g postgres sh -c "/opt/PostgreSQL/8.4/bin/pg_dump $dbname > /tmp/$db_file_name"
+# 
+# # sudo su postgres
+# # dbname=achecker
+# # /opt/PostgreSQL/8.4/bin/pg_dump $dbname > /tmp/backup.db
+# # exit
+# # db_file_name=backup.db.`date +%Y%m%d`
+# # sudo mv /tmp/backup.db $db_file_name
+# # sudo chown `whoami` $db_file_name
+# # cp $db_file_name backup.db
+
+
+# nginx
+- hosts: achecker
+  sudo: yes
+  tasks:
+    - apt: pkg=nginx
+    - template: src=templates/nginx/default.conf.j2 dest=/etc/nginx/conf.d/${alias}.conf
+    - service: name=nginx state=restarted
+

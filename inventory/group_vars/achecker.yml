@@ -1,0 +1,20 @@
+alias: achecker
+
+app_user: achecker
+app_dest: /srv/${alias}
+app_repository: git://github.com/atutor/AChecker.git
+
+phpfpm_template: templates/phpfpm.j2
+phpfpm_conf_path: /etc/php5/fpm/pool.d
+
+http_virtualhost: achecker.localhost
+http_baseurl: /
+http_root: /srv/${alias}
+http_ssl_certificate: /etc/ssl/certs/ssl-cert-snakeoil.pem
+http_ssl_certificate_key: /etc/ssl/private/ssl-cert-snakeoil.key
+    
+#db_host: localhost
+#db_port: 5432
+#db_name: achecker
+#db_username: achecker
+#db_password: achecker_password

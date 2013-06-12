@@ -1,0 +1,3 @@
+http_virtualhost: ${alias}.localhost
+db_login_password: root_mysql_password
+db_password: acheckeru_password
